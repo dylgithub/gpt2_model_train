@@ -76,15 +76,17 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
     if top_k > 0:
         # Remove all tokens with a probability less than the last token of the top-k
         # torch.topk()返回最后一维最大的top_k个元素，返回值为二维(values,indices)
-        # ...表示其他维度由计算机自行推断
-        indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
+        # 比较每个token概率值和选出的topk中最小的那个元素之间的大小，获得bool型结果。为了下一步的赋值
+        indices_to_remove = logits < torch.topk(logits, top_k)[0][-1]
         logits[indices_to_remove] = filter_value  # 对于topk之外的其他元素的logits值设为负无穷
 
     if top_p > 0.0:
         sorted_logits, sorted_indices = torch.sort(logits, descending=True)  # 对logits进行递减排序
+        # 获得累积结果
         cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
 
         # Remove tokens with cumulative probability above the threshold
+        # 获得bool型数据，大于阈值的位置开始变为True
         sorted_indices_to_remove = cumulative_probs > top_p
         # Shift the indices to the right to keep also the first token above the threshold
         sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
@@ -151,6 +153,7 @@ def main():
                 # 对于已生成的结果generated中的每个token添加一个重复惩罚项，降低其生成概率
                 for id in set(response):
                     next_token_logits[id] /= args.repetition_penalty
+                # 除以一个温度系数，使分布变得更加尖锐，就是为了使得高概率的token更容易被取到，一定程度上减弱模型生成内容的不通顺性
                 next_token_logits = next_token_logits / args.temperature
                 # 对于[UNK]的概率设为无穷小，也就是说模型的预测结果不可能是[UNK]这个token
                 next_token_logits[tokenizer.convert_tokens_to_ids('[UNK]')] = -float('Inf')
