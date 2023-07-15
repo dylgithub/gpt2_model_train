@@ -83,7 +83,7 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
     if top_p > 0.0:
         # 注意这里的排序，是选出前n个最大概率值之积大于top_p的元素
         sorted_logits, sorted_indices = torch.sort(logits, descending=True)  # 对logits进行递减排序
-        # 获得累积结果
+        # 获得累加结果
         cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
 
         # Remove tokens with cumulative probability above the threshold
